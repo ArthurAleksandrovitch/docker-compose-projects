@@ -286,3 +286,17 @@ postgres-docker-project/
 Каждая следующая лабораторная работа будет добавляться в отдельный каталог этого репозитория.
 
 
+
+### Скриншоты PostgreSQL
+
+**Список баз данных**
+
+![Список баз данных PostgreSQL](postgres-docker-project/screenshots/01-postgres-databases.png)
+
+**Тестовые записи таблицы users**
+
+![Таблица users](postgres-docker-project/screenshots/02-postgres-users.png)
+
+**Запущенный контейнер PostgreSQL**
+
+![Контейнер PostgreSQL](postgres-docker-project/screenshots/03-postgres-container.png)
