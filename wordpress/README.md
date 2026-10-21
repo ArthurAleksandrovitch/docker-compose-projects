@@ -1,4 +1,4 @@
-# WordPress с Docker Compose
+﻿# WordPress с Docker Compose
 
 ## Цель работы
 
@@ -108,18 +108,23 @@ docker compose up -d
 
 ### Главная страница WordPress
 
-![Главная страница WordPress](wordpress/screenshots/01-wordpress-homepage.png)
+![Главная страница WordPress](screenshots/01-wordpress-homepage.png)
 
 ### Панель администратора
 
-![Панель администратора WordPress](wordpress/screenshots/02-wordpress-admin.png)
+![Панель администратора WordPress](screenshots/02-wordpress-admin.png)
 
 ### Запущенные Docker-контейнеры
 
-![Docker-контейнеры](wordpress/screenshots/03-docker-containers.png)
+![Docker-контейнеры](screenshots/03-docker-containers.png)
 
 ## Результат работы
 
 WordPress развёрнут с помощью Docker Compose и подключён к базе данных MySQL 8.0. Данные сервисов сохраняются в именованных Docker volumes. Веб-приложение доступно по адресу http://localhost:8081.
 
 Лабораторная работа выполнена.
+
+
+
+
+
