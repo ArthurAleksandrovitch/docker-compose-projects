@@ -74,15 +74,15 @@ docker compose down
 
 **Главная страница Joomla**
 
-![Главная страница Joomla](https://raw.githubusercontent.com/ArthurAleksandrovitch/docker-compose-projects/main/joomla-docker/screenshots/01-joomla-homepage.png)
+![Главная страница Joomla](joomla-docker/screenshots/01-joomla-homepage.png)
 
 **Панель администратора Joomla**
 
-![Панель администратора Joomla](https://raw.githubusercontent.com/ArthurAleksandrovitch/docker-compose-projects/main/joomla-docker/screenshots/02-joomla-admin.png)
+![Панель администратора Joomla](joomla-docker/screenshots/02-joomla-admin.png)
 
 **Запущенные Docker-контейнеры**
 
-![Контейнеры Joomla](https://raw.githubusercontent.com/ArthurAleksandrovitch/docker-compose-projects/main/joomla-docker/screenshots/03-docker-containers.png)
+![Контейнеры Joomla](joomla-docker/screenshots/03-docker-containers.png)
 
 ---
 
@@ -150,15 +150,15 @@ docker compose up -d
 
 **Главная страница WordPress**
 
-![Главная страница WordPress](https://raw.githubusercontent.com/ArthurAleksandrovitch/docker-compose-projects/main/wordpress/screenshots/01-wordpress-homepage.png)
+![Главная страница WordPress](wordpress/screenshots/01-wordpress-homepage.png)
 
 **Панель администратора WordPress**
 
-![Панель администратора WordPress](https://raw.githubusercontent.com/ArthurAleksandrovitch/docker-compose-projects/main/wordpress/screenshots/02-wordpress-admin.png)
+![Панель администратора WordPress](wordpress/screenshots/02-wordpress-admin.png)
 
 **Запущенные Docker-контейнеры**
 
-![Контейнеры WordPress](https://raw.githubusercontent.com/ArthurAleksandrovitch/docker-compose-projects/main/wordpress/screenshots/03-docker-containers.png)
+![Контейнеры WordPress](wordpress/screenshots/03-docker-containers.png)
 
 ---
 
@@ -172,5 +172,5 @@ docker compose up -d
 - Добавлены скриншоты приложений и запущенных контейнеров.
 
 Каждая следующая лабораторная работа будет добавляться в отдельный каталог этого репозитория.
-'@ | Set-Content -Path .\README.md -Encoding utf8
+
 
