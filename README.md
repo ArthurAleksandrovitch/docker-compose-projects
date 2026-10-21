@@ -264,6 +264,7 @@ postgres-docker-project/
 │   └── 03-postgres-container.png
 ├── docker-compose.yml
 └── README.md
+```
 
 ---
 
@@ -291,12 +292,15 @@ postgres-docker-project/
 
 **Список баз данных**
 
-![Список баз данных PostgreSQL](postgres-docker-project/screenshots/01-postgres-databases.png)
+![Список баз данных PostgreSQL](<img width="796" height="178" alt="01-postgres-databases" src="https://github.com/user-attachments/assets/2049ff62-dffc-4c3a-a8a4-faef678cf970" />
+)
 
 **Тестовые записи таблицы users**
 
-![Таблица users](postgres-docker-project/screenshots/02-postgres-users.png)
+![Таблица users](<img width="794" height="138" alt="02-postgres-users" src="https://github.com/user-attachments/assets/aeb513ca-d669-4ddd-b2fd-b6c06d652ace" />
+)
 
 **Запущенный контейнер PostgreSQL**
 
-![Контейнер PostgreSQL](postgres-docker-project/screenshots/03-postgres-container.png)
+![Контейнер PostgreSQL](<img width="801" height="78" alt="03-postgres-container" src="https://github.com/user-attachments/assets/f9cc61db-be99-4a3d-9b5b-0ff7777f1ae1" />
+)
