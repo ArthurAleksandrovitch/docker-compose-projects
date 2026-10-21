@@ -8,7 +8,7 @@
 |---|---|---|---|
 | 1 | [Joomla + MariaDB](joomla-docker/) | Развёртывание CMS Joomla и базы данных MariaDB | Выполнено |
 | 2 | [WordPress + MySQL](wordpress/) | Развёртывание CMS WordPress и базы данных MySQL 8.0 | Выполнено |
-
+| 3 | [MySQL + phpMyAdmin](mysql-pma-app/) | Управление базами данных MySQL через веб-интерфейс phpMyAdmin | Выполнено |
 ---
 
 ## 1. Joomla + MariaDB
@@ -162,11 +162,91 @@ docker compose up -d
 
 ---
 
+## 3. MySQL + phpMyAdmin
+
+**Цель:** развернуть сервер MySQL 8.0 и веб-интерфейс phpMyAdmin с помощью Docker Compose, настроить подключение и проверить работу базы данных.
+
+### Используемые технологии
+
+- Docker и Docker Compose
+- MySQL 8.0
+- phpMyAdmin
+- YAML
+
+### Структура проекта
+
+```text
+mysql-pma-app/
+├── compose.yaml
+├── README.md
+└── screenshots/
+    ├── 01-phpmyadmin-database.png
+    ├── 02-docker-containers.png
+    └── 03-mysql-databases.png
+```
+
+### Архитектура
+
+Проект состоит из двух сервисов:
+
+- `mysql` — сервер MySQL 8.0, доступный на порту `3306`.
+- `phpmyadmin` — веб-интерфейс для управления базой данных, доступный на порту `8083`.
+
+Сервисы взаимодействуют через сеть `mysql-pma-network`. Данные MySQL сохраняются в именованном Docker-томе `mysql_data`.
+
+### Доступ к приложению
+
+- **phpMyAdmin:** http://localhost:8083
+- **Сервер MySQL:** `mysql`
+- **Пользователь:** `root`
+- **База данных:** `my_database`
+
+### Запуск
+
+```powershell
+cd mysql-pma-app
+docker compose config
+docker compose up -d
+docker compose ps -a
+```
+
+### Полезные команды
+
+```powershell
+docker compose logs -f phpmyadmin
+docker compose logs -f mysql
+docker compose stop
+docker compose start
+docker compose restart
+docker compose down
+```
+
+Команда `docker compose down` удаляет контейнеры и сеть проекта, но сохраняет именованный том с данными.
+
+### Скриншоты
+
+**phpMyAdmin и база данных**
+
+![phpMyAdmin с базой данных](mysql-pma-app/screenshots/01-phpmyadmin-database.png)
+
+**Запущенные Docker-контейнеры**
+
+![Контейнеры MySQL и phpMyAdmin](mysql-pma-app/screenshots/02-docker-containers.png)
+
+**Проверка баз данных MySQL**
+
+![Список баз данных MySQL](mysql-pma-app/screenshots/03-mysql-databases.png)
+
+---
+
 ## Результаты работы
 
 - Созданы два независимых проекта Docker Compose.
 - Joomla развёрнута с MariaDB.
 - WordPress развёрнут с MySQL 8.0.
+- Развёрнут MySQL 8.0 с помощью Docker Compose.
+- Настроен phpMyAdmin для управления базами данных через браузер.
+- Проверено подключение к MySQL и наличие базы данных `my_database`.
 - Настроены внутренние сети и постоянное хранение данных.
 - Подготовлены инструкции по запуску и управлению сервисами.
 - Добавлены скриншоты приложений и запущенных контейнеров.
