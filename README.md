@@ -1,4 +1,4 @@
-# Проекты Docker Compose
+﻿# Проекты Docker Compose
 
 Учебная лабораторная работа по развёртыванию приложений с помощью Docker Compose. Каждый проект расположен в отдельном каталоге общего репозитория и содержит конфигурацию, инструкции по запуску и скриншоты работающего приложения.
 
@@ -74,15 +74,15 @@ docker compose down
 
 **Главная страница Joomla**
 
-![Главная страница Joomla](joomla-docker/screenshots/01-joomla-homepage.png)
+![Главная страница Joomla](https://raw.githubusercontent.com/ArthurAleksandrovitch/docker-compose-projects/main/joomla-docker/screenshots/01-joomla-homepage.png)
 
 **Панель администратора Joomla**
 
-![Панель администратора Joomla](joomla-docker/screenshots/02-joomla-admin.png)
+![Панель администратора Joomla](https://raw.githubusercontent.com/ArthurAleksandrovitch/docker-compose-projects/main/joomla-docker/screenshots/02-joomla-admin.png)
 
 **Запущенные Docker-контейнеры**
 
-![Контейнеры Joomla](joomla-docker/screenshots/03-docker-containers.png)
+![Контейнеры Joomla](https://raw.githubusercontent.com/ArthurAleksandrovitch/docker-compose-projects/main/joomla-docker/screenshots/03-docker-containers.png)
 
 ---
 
@@ -150,15 +150,15 @@ docker compose up -d
 
 **Главная страница WordPress**
 
-![Главная страница WordPress](wordpress/screenshots/01-wordpress-homepage.png)
+![Главная страница WordPress](https://raw.githubusercontent.com/ArthurAleksandrovitch/docker-compose-projects/main/wordpress/screenshots/01-wordpress-homepage.png)
 
 **Панель администратора WordPress**
 
-![Панель администратора WordPress](wordpress/screenshots/02-wordpress-admin.png)
+![Панель администратора WordPress](https://raw.githubusercontent.com/ArthurAleksandrovitch/docker-compose-projects/main/wordpress/screenshots/02-wordpress-admin.png)
 
 **Запущенные Docker-контейнеры**
 
-![Контейнеры WordPress](wordpress/screenshots/03-docker-containers.png)
+![Контейнеры WordPress](https://raw.githubusercontent.com/ArthurAleksandrovitch/docker-compose-projects/main/wordpress/screenshots/03-docker-containers.png)
 
 ---
 
@@ -173,3 +173,4 @@ docker compose up -d
 
 Каждая следующая лабораторная работа будет добавляться в отдельный каталог этого репозитория.
 '@ | Set-Content -Path .\README.md -Encoding utf8
+
