@@ -1,0 +1,55 @@
+services:
+  # Сервис базы данных MariaDB
+  db:
+    # Официальный образ MariaDB
+    image: mariadb:11.5.2
+    restart: unless-stopped
+
+    environment:
+      MYSQL_ROOT_PASSWORD: example_root_password
+      MYSQL_DATABASE: joomla_db
+      MYSQL_USER: joomla_user
+      MYSQL_PASSWORD: joomla_password
+
+    volumes:
+      # Сохраняем данные базы данных
+      - db_data:/var/lib/mysql
+
+    networks:
+      - joomla-network
+
+  # Сервис Joomla
+  joomla:
+    depends_on:
+      - db
+
+    # Официальный образ Joomla с Apache
+    image: joomla:latest
+
+    ports:
+      # localhost:8082 -> контейнер:80
+      - "8082:80"
+
+    restart: unless-stopped
+
+    environment:
+      JOOMLA_DB_HOST: db:3306
+      JOOMLA_DB_USER: joomla_user
+      JOOMLA_DB_PASSWORD: joomla_password
+      JOOMLA_DB_NAME: joomla_db
+
+    volumes:
+      # Данные Joomla сохраняются в Docker volume
+      - joomla_data:/var/www/html
+
+    networks:
+      - joomla-network
+
+# Общая сеть Joomla и MariaDB
+networks:
+  joomla-network:
+
+# Постоянные Docker volumes
+volumes:
+  db_data:
+  joomla_data:
