@@ -9,6 +9,7 @@
 | 1 | [Joomla + MariaDB](joomla-docker/) | Развёртывание CMS Joomla и базы данных MariaDB | Выполнено |
 | 2 | [WordPress + MySQL](wordpress/) | Развёртывание CMS WordPress и базы данных MySQL 8.0 | Выполнено |
 | 3 | [MySQL + phpMyAdmin](mysql-pma-app/) | Управление базами данных MySQL через веб-интерфейс phpMyAdmin | Выполнено |
+| 4 | [PostgreSQL — Docker Compose](postgres-docker-project/) | Запуск PostgreSQL 15, создание баз данных и проверка SQL-запросов | Выполнено |
 ---
 
 ## 1. Joomla + MariaDB
@@ -239,6 +240,33 @@ docker compose down
 
 ---
 
+## 4. PostgreSQL — Docker Compose
+
+**Цель:** развернуть PostgreSQL 15 в Docker Compose, настроить инициализацию базы данных SQL-скриптом и проверить работу таблицы с тестовыми данными.
+
+### Используемые технологии
+
+- Docker и Docker Compose
+- PostgreSQL 15
+- SQL
+
+### Структура проекта
+
+```text
+postgres-docker-project/
+├── data/
+├── scripts/
+│   └── init.sql
+├── backups/
+├── screenshots/
+│   ├── 01-postgres-databases.png
+│   ├── 02-postgres-users.png
+│   └── 03-postgres-container.png
+├── docker-compose.yml
+└── README.md
+
+---
+
 ## Результаты работы
 
 - Созданы два независимых проекта Docker Compose.
@@ -250,6 +278,10 @@ docker compose down
 - Настроены внутренние сети и постоянное хранение данных.
 - Подготовлены инструкции по запуску и управлению сервисами.
 - Добавлены скриншоты приложений и запущенных контейнеров.
+- Развёрнут PostgreSQL 15 с помощью Docker Compose.
+- Созданы базы данных и пользователь через SQL-скрипт инициализации.
+- Проверена таблица `users` с двумя тестовыми записями.
+- Подготовлен каталог `backups` для резервного копирования.
 
 Каждая следующая лабораторная работа будет добавляться в отдельный каталог этого репозитория.
 

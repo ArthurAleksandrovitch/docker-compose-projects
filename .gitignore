@@ -1,0 +1,2 @@
+﻿/postgres-docker-project/data/*
+!/postgres-docker-project/data/.gitkeep
