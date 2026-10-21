@@ -1,16 +1,19 @@
 # Проекты Docker Compose
 
-Учебная лабораторная работа по развёртыванию приложений с помощью Docker Compose. Каждый проект размещается в отдельном каталоге общего репозитория и содержит конфигурацию, инструкции по запуску и подтверждение работоспособности.
+Учебная лабораторная работа по развёртыванию приложений с помощью Docker Compose. Каждый проект расположен в отдельном каталоге общего репозитория и содержит конфигурацию, инструкции по запуску и скриншоты работающего приложения.
 
 ## Содержание
 
 | № | Проект | Описание | Статус |
 |---|---|---|---|
-| 1 | [Joomla + MariaDB](joomla-docker/) | Развёртывание CMS Joomla и базы данных MariaDB с помощью Docker Compose | Выполнено |
+| 1 | [Joomla + MariaDB](joomla-docker/) | Развёртывание CMS Joomla и базы данных MariaDB | Выполнено |
+| 2 | [WordPress + MySQL](wordpress/) | Развёртывание CMS WordPress и базы данных MySQL 8.0 | Выполнено |
+
+---
 
 ## 1. Joomla + MariaDB
 
-**Цель:** получить практические навыки контейнеризации веб-приложения и базы данных, настройки сети, постоянного хранения данных и управления сервисами с помощью Docker Compose.
+**Цель:** изучить контейнеризацию веб-приложения и базы данных, настройку сети, постоянного хранения данных и управление сервисами Docker Compose.
 
 ### Используемые технологии
 
@@ -22,45 +25,16 @@
 ### Структура проекта
 
 ```text
-docker-compose-projects/
+joomla-docker/
+├── compose.yaml
 ├── README.md
-└── joomla-docker/
-    ├── compose.yaml
-    └── screenshots/
-        ├── 01-joomla-homepage.png
-        ├── 02-joomla-admin.png
-        └── 03-docker-containers.png
-```
-
-### Запуск проекта
-
-Перейдите в каталог проекта:
-
-```powershell
-cd joomla-docker
-```
-
-Проверьте конфигурацию:
-
-```powershell
-docker compose config
-```
-
-Запустите сервисы:
-
-```powershell
-docker compose up -d
-```
-
-Проверьте состояние контейнеров:
-
-```powershell
-docker compose ps
+└── screenshots/
+    ├── 01-joomla-homepage.png
+    ├── 02-joomla-admin.png
+    └── 03-docker-containers.png
 ```
 
 ### Доступ к приложению
-
-После запуска и завершения первоначальной настройки Joomla:
 
 - **Сайт:** http://localhost:8082
 - **Панель администратора:** http://localhost:8082/administrator
@@ -69,59 +43,32 @@ docker compose ps
 
 Проект состоит из двух сервисов:
 
-- **joomla** — веб-приложение Joomla на Apache, доступное через порт `8082` хост-компьютера.
-- **db** — сервер базы данных MariaDB.
+- `joomla` — веб-приложение Joomla, доступное через порт `8082`.
+- `db` — сервер базы данных MariaDB.
 
-Сервисы взаимодействуют через общую Docker-сеть `joomla-network`. Данные базы данных и файлы Joomla хранятся в именованных Docker volumes `db_data` и `joomla_data`, поэтому они сохраняются при пересоздании контейнеров.
+Сервисы взаимодействуют через Docker-сеть `joomla-network`. Для хранения данных используются тома `db_data` и `joomla_data`.
+
+### Запуск
+
+```powershell
+cd joomla-docker
+docker compose config
+docker compose up -d
+docker compose ps
+```
 
 ### Полезные команды
 
-Просмотр логов Joomla:
-
 ```powershell
 docker compose logs -f joomla
-```
-
-Просмотр логов базы данных:
-
-```powershell
 docker compose logs -f db
-```
-
-Остановка сервисов без удаления контейнеров:
-
-```powershell
 docker compose stop
-```
-
-Повторный запуск:
-
-```powershell
 docker compose start
-```
-
-Перезапуск:
-
-```powershell
 docker compose restart
-```
-
-Остановка и удаление контейнеров и сети:
-
-```powershell
 docker compose down
 ```
 
-> Команда `docker compose down -v` дополнительно удаляет именованные тома с данными. Используйте её только тогда, когда действительно хотите удалить сохранённые данные проекта.
-
-### Результат выполнения
-
-- Подготовлена конфигурация Docker Compose.
-- Запущены контейнеры Joomla и MariaDB.
-- Настроено взаимодействие сервисов через Docker-сеть.
-- Выполнена первоначальная установка Joomla.
-- Проверена доступность сайта и панели администратора.
-- Подготовлены скриншоты работающего проекта.
+> Команда `docker compose down -v` удаляет именованные тома и сохранённые в них данные. Используйте её только при необходимости полного сброса проекта.
 
 ### Скриншоты
 
@@ -129,16 +76,100 @@ docker compose down
 
 ![Главная страница Joomla](joomla-docker/screenshots/01-joomla-homepage.png)
 
-**Панель администратора**
+**Панель администратора Joomla**
 
 ![Панель администратора Joomla](joomla-docker/screenshots/02-joomla-admin.png)
 
-**Работающие Docker-контейнеры**
+**Запущенные Docker-контейнеры**
 
-![Состояние Docker-контейнеров](joomla-docker/screenshots/03-docker-containers.png)
+![Контейнеры Joomla](joomla-docker/screenshots/03-docker-containers.png)
 
 ---
 
-## Дальнейшие задания
+## 2. WordPress + MySQL
 
-Следующие проекты лабораторной работы будут добавляться в отдельные каталоги этого репозитория и в таблицу содержания по мере выполнения.
+**Цель:** развернуть WordPress с использованием Docker Compose и настроить взаимодействие с базой данных MySQL 8.0.
+
+### Используемые технологии
+
+- Docker и Docker Compose
+- WordPress
+- MySQL 8.0
+- YAML
+
+### Структура проекта
+
+```text
+wordpress/
+├── compose.yaml
+├── README.md
+└── screenshots/
+    ├── 01-wordpress-homepage.png
+    ├── 02-wordpress-admin.png
+    └── 03-docker-containers.png
+```
+
+### Архитектура
+
+Проект состоит из двух сервисов:
+
+- `wordpress` — веб-приложение WordPress, доступное через порт `8081`.
+- `db` — сервер базы данных MySQL 8.0.
+
+Сервисы взаимодействуют через Docker-сеть `wp-network`. Для хранения данных используются тома `db_data` и `wordpress_data`.
+
+### Доступ к приложению
+
+- **Сайт:** http://localhost:8081
+- **Панель администратора:** http://localhost:8081/wp-admin/
+
+### Запуск
+
+```powershell
+cd wordpress
+docker compose config
+docker compose up -d
+docker compose ps
+```
+
+При первом запуске необходимо пройти первоначальную настройку WordPress в браузере и создать учётную запись администратора.
+
+### Полезные команды
+
+```powershell
+docker compose logs
+docker compose logs wordpress
+docker compose logs db
+docker compose down
+docker compose up -d
+```
+
+Команда `docker compose down` останавливает и удаляет контейнеры и сеть проекта, но сохраняет именованные тома с данными.
+
+### Скриншоты
+
+**Главная страница WordPress**
+
+![Главная страница WordPress](wordpress/screenshots/01-wordpress-homepage.png)
+
+**Панель администратора WordPress**
+
+![Панель администратора WordPress](wordpress/screenshots/02-wordpress-admin.png)
+
+**Запущенные Docker-контейнеры**
+
+![Контейнеры WordPress](wordpress/screenshots/03-docker-containers.png)
+
+---
+
+## Результаты работы
+
+- Созданы два независимых проекта Docker Compose.
+- Joomla развёрнута с MariaDB.
+- WordPress развёрнут с MySQL 8.0.
+- Настроены внутренние сети и постоянное хранение данных.
+- Подготовлены инструкции по запуску и управлению сервисами.
+- Добавлены скриншоты приложений и запущенных контейнеров.
+
+Каждая следующая лабораторная работа будет добавляться в отдельный каталог этого репозитория.
+'@ | Set-Content -Path .\README.md -Encoding utf8
