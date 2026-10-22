@@ -1,0 +1,301 @@
+{% extends "base.html" %}
+{% from "_expense_split.html" import split_box, split_script %}
+{% block content %}
+<style>
+  .recurring-page-tabs {
+    border-bottom: 1px solid var(--border-color);
+    margin-bottom: 1.5rem;
+  }
+  .tab-button {
+    border-bottom: 3px solid transparent;
+    color: var(--muted-text);
+    padding: 0.75rem 1rem;
+    margin-bottom: -1px;
+    transition: all 0.2s ease;
+    cursor: pointer;
+    font-weight: 500;
+  }
+  .tab-button:hover {
+    color: var(--text-color);
+    background: var(--hover-bg);
+    border-color: var(--border-color);
+  }
+  .tab-button.active {
+    color: var(--primary-text);
+    border-color: var(--primary-color);
+  }
+  .tab-content {
+    display: none;
+  }
+  .tab-content.active {
+    display: block;
+  }
+  .rules-container {
+    display: grid;
+    gap: 1rem;
+    margin-bottom: 2rem;
+  }
+  .rule-card {
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius);
+    padding: 1rem;
+    background: var(--card-background-color);
+  }
+  .rule-card details {
+    margin: 0;
+  }
+  .rule-card summary {
+    cursor: pointer;
+    font-weight: 600;
+    padding: 0.5rem;
+    user-select: none;
+  }
+  .rule-card summary:hover {
+    background: var(--hover-bg);
+    border-radius: 0.25rem;
+  }
+  .rule-metadata {
+    font-size: 0.875rem;
+    color: var(--muted-text);
+    margin-top: 0.25rem;
+  }
+  .rule-actions {
+    display: flex;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+  }
+  /* Normalise input/select heights so dropdowns match text boxes */
+  .rule-card input:not([type="checkbox"]):not([type="hidden"]),
+  .rule-card select,
+  #recurring-form input:not([type="checkbox"]):not([type="hidden"]),
+  #recurring-form select {
+    height: 2.5rem; /* 40px — same as Tailwind h-10 */
+    box-sizing: border-box;
+  }
+</style>
+
+{% set expense_precision = (expense_settings.fraction_precision if expense_settings is defined and expense_settings.fraction_precision is defined else 2) %}
+
+<div class="max-w-4xl mx-auto space-y-6">
+  <div class="flex items-center justify-between mb-6">
+    <div class="flex items-center gap-4">
+      <a href="/expenses" class="btn btn-ghost btn-sm" style="color: var(--primary-text);">
+        <i class="fas fa-arrow-left" aria-hidden="true"></i> {{ _('Back to Calendar') }}
+      </a>
+      <h1 class="page-title">{{ _('Recurring Expense Rules') }}</h1>
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="recurring-page-tabs flex border-b border-gray-200">
+    <button class="tab-button {% if active_tab == 'recurring-rules' %}active{% endif %}" data-tab="recurring-rules">
+      <i class="fas fa-repeat mr-2"></i>{{ _('Recurring Rules') }}
+    </button>
+    <button class="tab-button {% if active_tab == 'general-settings' %}active{% endif %}" data-tab="general-settings">
+      <i class="fas fa-cog mr-2"></i>{{ _('General Settings') }}
+    </button>
+  </div>
+
+  <!-- Tab Content -->
+  <div class="tab-content-container">
+    <!-- Recurring Rules Tab -->
+    <div id="recurring-rules" class="tab-content {% if active_tab == 'recurring-rules' %}active{% endif %}">
+      <div class="space-y-4">
+        {# Stored frequency, mode and split keys stay as they are; only the label shown is translated -#}
+        {% set frequency_labels = {'daily': _('daily'), 'weekly': _('weekly'), 'monthly': _('monthly')} -%}
+        {% set mode_labels = {'day_of_month': _('day_of_month'), 'calendar': _('calendar')} -%}
+        {% set split_labels = {'shares': _('by shares'), 'percent': _('by percentage'), 'amount': _('by amount')} -%}
+        <h2 class="text-xl font-semibold">{{ _('Active Rules') }}</h2>
+        
+        {% if rules %}
+        <div class="rules-container">
+          {% for r in rules %}
+          <div class="rule-card">
+            <details>
+              <summary>
+                <div class="flex items-center justify-between gap-4">
+                  <div class="min-w-0">
+                    <div class="font-medium">{{ r.title }} — {{ frequency_labels.get(r.frequency, r.frequency) }}{% if r.frequency=='monthly' %} ({{ mode_labels.get(r.monthly_mode or 'day_of_month', r.monthly_mode) }}){% endif %}</div>
+                    <div class="rule-metadata">
+                      {{ r.default_quantity }} × {{ ('%.' ~ expense_precision ~ 'f')|format(r.unit_price or 0) }} 
+                      • {{ r.start_date }}{% if r.end_date %} → {{ r.end_date }}{% endif %} 
+                      • {{ _('by %(name)s', name=r.creator) }}{% if r.split_members %} • {{ _('split with %(names)s', names=r.split_members|join(', ')) }}{% if r.split_mode != 'equal' %} ({{ split_labels[r.split_mode] }}){% endif %}{% endif %}
+                    </div>
+                  </div>
+                  <div class="flex items-center gap-2 shrink-0">
+                    <button type="button" class="btn btn-secondary edit-btn" data-creator="{{ r.creator }}" onclick="this.closest('details').open=true">
+                      <i class="fas fa-edit mr-1"></i>{{ _('Edit') }}
+                    </button>
+                  </div>
+                </div>
+              </summary>
+
+              <!-- Edit Form -->
+              <form method="POST" action="/expenses/recurring/edit/{{ r.id }}" class="grid grid-cols-1 md:grid-cols-3 gap-3 mt-4 pt-4 border-t recurring-edit-form" data-creator="{{ r.creator }}">
+                <input type="hidden" name="user" value="">
+                <div class="md:col-span-3 p-3 rounded border bg-amber-50 text-amber-800 text-xs">
+                  {{ _('Editing a recurring rule can affect generated entries. Choose a strategy to avoid accidental history loss.') }}
+                </div>
+                <div>
+                  <label for="rule-{{ r.id }}-title" class="text-sm text-gray-600">{{ _('Title') }}</label>
+                  <input id="rule-{{ r.id }}-title" type="text" name="title" class="w-full border rounded p-2" value="{{ r.title }}">
+                </div>
+                <div>
+                  <label for="rule-{{ r.id }}-category" class="text-sm text-gray-600">{{ _('Category') }}</label>
+                  <input id="rule-{{ r.id }}-category" type="text" name="category" class="w-full border rounded p-2" value="{{ r.category or '' }}">
+                  <div class="edit-category-chips mt-2 flex flex-wrap gap-2"></div>
+                </div>
+                <div>
+                  <label for="rule-{{ r.id }}-unit-price" class="text-sm text-gray-600">{{ _('Unit Price') }}</label>
+                  <input id="rule-{{ r.id }}-unit-price" type="number" step="0.01" name="unit_price" class="w-full border rounded p-2" value="{{ ('%.' ~ expense_precision ~ 'f')|format(r.unit_price or 0) }}">
+                </div>
+                <div>
+                  <label for="rule-{{ r.id }}-default-quantity" class="text-sm text-gray-600">{{ _('Default Qty') }}</label>
+                  <input id="rule-{{ r.id }}-default-quantity" type="number" step="0.01" name="default_quantity" class="w-full border rounded p-2" value="{{ r.default_quantity }}">
+                </div>
+                <div>
+                  <label for="rule-{{ r.id }}-frequency" class="text-sm text-gray-600">{{ _('Frequency') }}</label>
+                  <select id="rule-{{ r.id }}-frequency" name="frequency" class="w-full border rounded p-2">
+                    <option value="daily" {% if r.frequency=='daily' %}selected{% endif %}>{{ _('Daily') }}</option>
+                    <option value="weekly" {% if r.frequency=='weekly' %}selected{% endif %}>{{ _('Weekly') }}</option>
+                    <option value="monthly" {% if r.frequency=='monthly' %}selected{% endif %}>{{ _('Monthly') }}</option>
+                  </select>
+                </div>
+                <div>
+                  <label for="rule-{{ r.id }}-monthly-mode" class="text-sm text-gray-600">{{ _('Monthly Mode') }}</label>
+                  <select id="rule-{{ r.id }}-monthly-mode" name="monthly_mode" class="w-full border rounded p-2">
+                    <option value="day_of_month" {% if (r.monthly_mode or 'day_of_month')=='day_of_month' %}selected{% endif %}>{{ _('Same day-of-month') }}</option>
+                    <option value="calendar" {% if (r.monthly_mode or 'day_of_month')=='calendar' %}selected{% endif %}>{{ _('Calendar month') }}</option>
+                  </select>
+                </div>
+                <div>
+                  <label for="rule-{{ r.id }}-start-date" class="text-sm text-gray-600">{{ _('Start Date') }}</label>
+                  <input id="rule-{{ r.id }}-start-date" type="date" name="start_date" class="w-full border rounded p-2" value="{{ r.start_date }}">
+                </div>
+                <div>
+                  <label for="rule-{{ r.id }}-end-date" class="text-sm text-gray-600">{{ _('End Date') }}</label>
+                  <input id="rule-{{ r.id }}-end-date" type="date" name="end_date" class="w-full border rounded p-2" value="{{ r.end_date or '' }}">
+                </div>
+                <div>
+                  <label for="rule-{{ r.id }}-edit-strategy" class="text-sm text-gray-600">{{ _('Edit Strategy') }}</label>
+                  <select id="rule-{{ r.id }}-edit-strategy" name="edit_strategy" class="w-full border rounded p-2">
+                    <option value="apply_from" selected>{{ _('Keep history, apply changes from effective date') }}</option>
+                    <option value="split_rule">{{ _('Create new rule from effective date (split)') }}</option>
+                    <option value="rewrite_all">{{ _('Rewrite entire rule history (destructive)') }}</option>
+                  </select>
+                </div>
+                {% if split_people %}
+                <div class="md:col-span-3">
+                  {# By amount is left out: a rule's amount changes with quantity #}
+                  {{ split_box(split_people, r.split_mode, r.split_weights, r.split_members, allow_amount=false) }}
+                </div>
+                {% endif %}
+                {# Today, kept inside the rule's own start/end window -#}
+                {% set eff_default = today -%}
+                {% if r.start_date and eff_default < r.start_date %}{% set eff_default = r.start_date %}{% endif -%}
+                {% if r.end_date and eff_default > r.end_date %}{% set eff_default = r.end_date %}{% endif -%}
+                <div class="effective-from-group">
+                  <label for="rule-{{ r.id }}-effective-from" class="text-sm text-gray-600">{{ _('Effective From') }}</label>
+                  <input id="rule-{{ r.id }}-effective-from" type="date" name="effective_from" class="w-full border rounded p-2" value="{{ eff_default }}">
+                  <p class="text-xs text-gray-500 mt-1">{{ _('Used by apply/split strategies.') }}</p>
+                </div>
+                <div class="md:col-span-3 flex justify-end gap-2">
+                  <button type="button" class="btn btn-secondary cancel-edit" onclick="this.closest('details').open=false">{{ _('Cancel') }}</button>
+                  <button type="submit" class="btn btn-primary">{{ _('Save') }}</button>
+                </div>
+              </form>
+
+              <!-- Delete Form -->
+              <form method="POST" action="/expenses/recurring/delete/{{ r.id }}" class="mt-3 pt-3 border-t flex items-center gap-3 delete-form recurring-delete-form" data-creator="{{ r.creator }}">
+                <input type="hidden" name="user">
+                <label class="text-sm text-gray-600 inline-flex items-center gap-2">
+                  <input type="checkbox" name="delete_entries" value="1" class="rounded"> {{ _('Delete generated entries (unchecked = keep history)') }}
+                </label>
+                <span class="text-xs text-red-600">{{ _('This permanently removes linked generated entries.') }}</span>
+                <button type="submit" class="btn btn-danger">{{ _('Delete Rule') }}</button>
+              </form>
+            </details>
+          </div>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="p-4 bg-gray-50 rounded border">
+          <p class="text-gray-500">{{ _('No recurring rules yet. Add one below.') }}</p>
+        </div>
+        {% endif %}
+
+        <!-- Add New Rule Form -->
+        <div class="border rounded p-6 bg-blue-50 mt-6">
+          <h3 class="text-lg font-semibold mb-4">{{ _('Add New Rule') }}</h3>
+          <form id="recurring-form" method="POST" action="/expenses" class="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
+            <input type="hidden" name="form_type" value="recurring">
+            <input type="text" name="title" class="md:col-span-4 p-2 border rounded" placeholder="{{ _('Title (e.g., Milk)') }}" required>
+            <div class="md:col-span-4">
+              <div id="recurring-category-chips" class="mb-2 flex flex-wrap gap-2"></div>
+              <input type="text" name="category" class="w-full p-2 border rounded" placeholder="{{ _('Category (opt)') }}">
+            </div>
+            <input type="number" step="0.01" name="unit_price" class="md:col-span-4 p-2 border rounded" placeholder="{{ _('Unit price') }}" required>
+            <input type="number" step="0.01" name="default_quantity" class="md:col-span-4 p-2 border rounded" placeholder="{{ _('Default qty') }}" required>
+            <select name="frequency" class="md:col-span-4 p-2 border rounded">
+              <option value="daily">{{ _('Daily') }}</option>
+              <option value="weekly">{{ _('Weekly') }}</option>
+              <option value="monthly">{{ _('Monthly') }}</option>
+            </select>
+            <select name="monthly_mode" class="md:col-span-4 p-2 border rounded">
+              <option value="day_of_month">{{ _('Monthly mode: Same day-of-month') }}</option>
+              <option value="calendar">{{ _('Monthly mode: Calendar boundary') }}</option>
+            </select>
+            <input type="date" name="start_date" class="md:col-span-6 p-2 border rounded" placeholder="{{ _('Start') }}">
+            <input type="date" name="end_date" class="md:col-span-6 p-2 border rounded" placeholder="{{ _('End (optional)') }}">
+            <input type="hidden" name="creator" id="recCreator">
+            {% if split_people %}
+            <div class="md:col-span-12">
+              {{ split_box(split_people, allow_amount=false) }}
+            </div>
+            {% endif %}
+            <div class="md:col-span-12 flex justify-end">
+              <button type="submit" class="btn btn-primary">{{ _('Add Recurring Rule') }}</button>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- General Settings Tab -->
+    <div id="general-settings" class="tab-content {% if active_tab == 'general-settings' %}active{% endif %}">
+      <div class="space-y-6">
+        <h2 class="text-xl font-semibold">{{ _('Expense Settings') }}</h2>
+        
+        <form method="POST" action="/expenses/settings" class="space-y-4 max-w-md">
+          <input type="hidden" name="user" id="settings-user">
+          
+          <div>
+            <label for="currency-input" class="text-sm text-gray-600 font-semibold">{{ _('Currency symbol') }}</label>
+            <input type="text" name="currency" id="currency-input" class="w-full border rounded p-2 mt-1" placeholder="₹">
+          </div>
+          
+          <div>
+            <label for="fraction-factor-input" class="text-sm text-gray-600 font-semibold">{{ _('Fraction factor') }}</label>
+            <input type="number" min="1" step="1" name="fraction_factor" id="fraction-factor-input" class="w-full border rounded p-2 mt-1" value="{{ expense_settings.fraction_factor if expense_settings is defined and expense_settings.fraction_factor is defined else 100 }}" placeholder="100">
+            <p class="text-xs text-gray-500 mt-2">{{ _('How many lower currency units make one main unit, like ₹1 contains 100 paise. Common values: 1, 100, 1000.') }}</p>
+          </div>
+          
+          <div>
+            <label for="categories-input" class="text-sm text-gray-600 font-semibold">{{ _('Categories (comma separated)') }}</label>
+            <input type="text" name="categories" id="categories-input" class="w-full border rounded p-2 mt-1" placeholder="{{ _('Groceries, Utilities, Housing') }}">
+            <div id="category-chips" class="mt-3 flex flex-wrap gap-2"></div>
+          </div>
+          
+          <div class="flex justify-end pt-4">
+            <button type="submit" class="btn btn-primary">{{ _('Save Settings') }}</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+</div>
+
+{{ split_script() }}
+<script id="expenseSettingsData" type="application/json">{{ expense_settings | tojson | safe }}</script>
+<script src="{{ asset_url('js/pages/expenses_recurring.js') }}"></script>
+{% endblock %}

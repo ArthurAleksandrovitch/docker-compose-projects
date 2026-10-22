@@ -13,6 +13,8 @@
 | 5 | [PostgreSQL + pgAdmin](postgres-pgadmin-app/) | Управление PostgreSQL через веб-интерфейс pgAdmin и работа с таблицами | Выполнено |
 | 6 | [DrawDB — проектирование ER-диаграмм](#drawdb--проектирование-er-диаграмм) | Создание ER-диаграммы банковской системы из семи таблиц | Выполнено |
 | 7 | [LibreDB Studio](#libredb-studio) | Веб-интерфейс для работы с базами данных в Docker | Выполнено |
+| 8 | [HomeHub](#homehub) | Семейная веб-панель для заметок, покупок, домашних дел и напоминаний | Выполнено |
+
 ---
 
 ## 1. Joomla + MariaDB
@@ -454,3 +456,58 @@ docker compose -f compose.yml down
 ### Скриншот
 
 ![LibreDB Studio — работающий веб-интерфейс](screenshots/libredb-studio/libredb-studio.png)
+
+---
+
+## HomeHub
+
+**HomeHub** — семейная веб-панель для заметок, списков покупок, домашних дел, рецептов, напоминаний и учёта расходов.
+
+### Используемые технологии
+
+- Docker
+- Docker Compose
+- HomeHub
+- Flask / Gunicorn
+- YAML
+- Docker volumes и bind mounts
+
+### Запуск проекта
+
+Перейдите в каталог проекта:
+
+    cd homehub
+
+Запустите приложение:
+
+    docker compose up -d
+    docker compose ps
+    docker compose logs --tail=50
+
+Откройте приложение в браузере: http://localhost:5000
+
+### Конфигурация
+
+- `compose.yml` — настройки контейнера.
+- `config.yml` — имя панели, участники семьи и доступные функции.
+- `.env` — секретный ключ приложения.
+
+Не публикуйте содержимое `.env` в репозитории. Перед предоставлением доступа другим устройствам рекомендуется установить пароль в `config.yml`.
+
+### Остановка проекта
+
+Остановить контейнер:
+
+    docker compose stop
+
+Повторный запуск:
+
+    docker compose start
+
+Остановить и удалить контейнер, сохранив данные:
+
+    docker compose down
+
+### Скриншот
+
+![HomeHub — запущенная семейная панель](screenshots/homehub/homehub.png)

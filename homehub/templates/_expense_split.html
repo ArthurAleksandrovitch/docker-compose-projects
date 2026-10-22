@@ -1,0 +1,56 @@
+{# "Split with" picker shared by the expense modal and the recurring rule forms; nobody is ticked unless a stored split says so #}
+{% macro split_box(people, mode='equal', weights={}, selected=none, allow_amount=true) %}
+<div class="split-box">
+  <input type="hidden" name="split_present" value="1">
+  <div class="flex items-center justify-between gap-2">
+    <label class="text-sm text-gray-600">{{ _('Split with') }}</label>
+    <select name="split_mode" class="split-mode border rounded p-1 text-sm" aria-label="{{ _('Split method') }}">
+      <option value="equal" {% if mode == 'equal' %}selected{% endif %}>{{ _('Equally') }}</option>
+      <option value="shares" {% if mode == 'shares' %}selected{% endif %}>{{ _('By shares') }}</option>
+      <option value="percent" {% if mode == 'percent' %}selected{% endif %}>{{ _('By percentage') }}</option>
+      {% if allow_amount %}<option value="amount" {% if mode == 'amount' %}selected{% endif %}>{{ _('By amount') }}</option>{% endif %}
+    </select>
+  </div>
+  {# Keep stored participants who have since left the member list, so editing never drops them #}
+  {% set ns = namespace(members=people|list) %}
+  {% for member in (selected or []) %}{% if member not in ns.members %}{% set ns.members = ns.members + [member] %}{% endif %}{% endfor %}
+  <div class="split-rows mt-1 grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1">
+    {% for member in ns.members %}
+    <div class="split-row flex items-center justify-between gap-2 text-sm">
+      <label class="inline-flex items-center gap-2 min-w-0">
+        <input type="checkbox" name="split_with" value="{{ member }}" class="rounded split-member" {% if selected and member in selected %}checked{% endif %}>
+        <span class="min-w-0">
+          <span class="block truncate">{{ member }}</span>
+          <span class="split-share block text-xs text-gray-500"></span>
+        </span>
+      </label>
+      <input type="number" step="any" min="0" name="split_weight__{{ member }}" value="{{ weights.get(member, '') }}" class="split-weight border rounded text-right hidden" aria-label="{{ _('%(name)s split value', name=member) }}">
+    </div>
+    {% endfor %}
+  </div>
+  <p class="split-hint text-xs text-gray-500 mt-1"></p>
+</div>
+{% endmacro %}
+
+{% macro split_script() %}
+<style>
+  /* Mode dropdown and value fields form one right-hand column: same width, same height */
+  .split-box select.split-mode,
+  .split-box input.split-weight { width: 9rem; height: 2rem !important; padding: 0.25rem 0.5rem; flex-shrink: 0; }
+  .split-box input.split-weight:disabled { opacity: 0.4; }
+  /* Spinner arrows are no use on money and quantity fields */
+  .split-box input.split-weight,
+  #expense-form input[type="number"],
+  #recurring-form input[type="number"],
+  .recurring-edit-form input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
+  .split-box input.split-weight::-webkit-inner-spin-button,
+  .split-box input.split-weight::-webkit-outer-spin-button,
+  #expense-form input[type="number"]::-webkit-inner-spin-button,
+  #expense-form input[type="number"]::-webkit-outer-spin-button,
+  #recurring-form input[type="number"]::-webkit-inner-spin-button,
+  #recurring-form input[type="number"]::-webkit-outer-spin-button,
+  .recurring-edit-form input[type="number"]::-webkit-inner-spin-button,
+  .recurring-edit-form input[type="number"]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+</style>
+<script src="{{ asset_url('js/expense_split.js') }}"></script>
+{% endmacro %}

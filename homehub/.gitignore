@@ -1,0 +1,35 @@
+# Database files
+data/app.db
+data/app.db-wal
+data/app.db-shm
+data/secret_key
+database.db
+
+# User-uploaded files
+uploads/
+media/
+pdfs/
+
+# Python cache files
+*.pyc
+__pycache__/
+.pytest_cache/
+.coverage
+coverage.xml
+htmlcov/
+.venv/
+
+# Environment variables
+.env
+config.yml
+
+# Node.js dependencies and build artifacts
+node_modules/
+package-lock.json
+static/output.css
+static/custom.css
+tests/__pycache__/
+# Compiled translation catalogs (built from the .po files)
+translations/**/*.mo
+# Generated QR codes
+static/qr_*.png

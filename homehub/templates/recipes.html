@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% block content %}
+<!-- Quill Editor CSS (local) -->
+<link href="{{ url_for('static', filename='quill/quill.snow.css') }}" rel="stylesheet">
+
+<div class="max-w-5xl mx-auto">
+    <div class="page-header">
+        <h1 class="page-title">{{ _('Recipe Book') }}</h1>
+        <p class="page-subtitle">{{ _("The family's recipes, with ingredients and steps.") }}</p>
+    </div>
+    
+    <!-- Add/Edit Form -->
+    <form method="POST" action="/recipes" class="mb-4 card p-4" id="recipeForm">
+        <input type="hidden" name="recipe_id" id="recipeId" value="{{ form_recipe_id if form_recipe_id is defined else '' }}">
+        <input type="hidden" name="creator" id="creator">
+        
+        <div class="mb-3">
+            <label for="recipeTitle" class="block text-sm font-medium text-gray-600 mb-1">{{ _('Recipe Title') }}</label>
+            <input type="text" name="title" id="recipeTitle" value="{{ form_title if form_title is defined else '' }}" class="w-full" placeholder="{{ _('Chocolate Chip Cookies') }}" required>
+        </div>
+        
+        <div class="mb-3">
+            <label for="recipeLink" class="block text-sm font-medium text-gray-600 mb-1">{{ _('Link (optional)') }}</label>
+            <input type="url" name="link" id="recipeLink" value="{{ form_link if form_link is defined else '' }}" class="w-full" placeholder="https://example.com/recipe">
+        </div>
+        
+        <div class="mb-3">
+            <label for="tagInput" class="block text-sm font-medium text-gray-600 mb-1">{{ _('Tags') }}</label>
+            <div class="flex flex-wrap gap-2 rounded items-start h-10" id="tagInputWrap">
+                <input type="text" id="tagInput" class="flex-1 min-w-[140px] h-full" placeholder="{{ _('Add tag and press Enter') }}">
+            </div>
+            <input type="hidden" name="tags" id="tagsInput" value="{{ form_tags if form_tags is defined else '[]' }}">
+            <div class="mt-2 flex flex-wrap gap-2 text-xs" id="tagLibrary"></div>
+        </div>
+        
+        <div class="mb-3">
+            <label class="block text-sm font-medium text-gray-600 mb-1">{{ _('Ingredients') }}</label>
+            <div id="ingredientsEditor" class="mb-4"></div>
+            <textarea name="ingredients" id="ingredientsHidden" style="display:none;"></textarea>
+        </div>
+        
+        <div class="mb-3">
+            <label class="block text-sm font-medium text-gray-600 mb-1">{{ _('Instructions') }}</label>
+            <div id="instructionsEditor" class="mb-4"></div>
+            <textarea name="instructions" id="instructionsHidden" style="display:none;"></textarea>
+        </div>
+        <p id="recipeFormError" class="text-sm text-red-600 hidden" role="alert"></p>
+        
+        <div class="flex gap-2 mt-6">
+            <button type="submit" class="btn btn-primary"><i class="fa-solid fa-floppy-disk" aria-hidden="true"></i>{{ _('Update Recipe') if form_recipe_id is defined else _('Add Recipe') }}</button>
+            {% if form_recipe_id is defined %}
+            <a href="/recipes" class="btn btn-secondary">{{ _('Cancel') }}</a>
+            {% endif %}
+        </div>
+    </form>
+    
+    {% if form_ingredients is defined %}
+    <script id="formIngredientsJSON" type="application/json">{{ form_ingredients|tojson|safe }}</script>
+    {% endif %}
+    {% if form_instructions is defined %}
+    <script id="formInstructionsJSON" type="application/json">{{ form_instructions|tojson|safe }}</script>
+    {% endif %}
+    
+    <!-- Filter by Tags -->
+    <div class="mb-4 flex flex-wrap gap-2 items-center" id="filterSection">
+        <span class="text-sm text-gray-500">{{ _('Filter by tag:') }}</span>
+        <div id="filterTags" class="flex flex-wrap gap-2"></div>
+        <button id="clearTagFilters" class="btn btn-ghost btn-sm">{{ _('Clear') }}</button>
+    </div>
+    
+    <!-- Recipes List -->
+    <div id="recipesList">
+        {% for recipe in recipes %}
+        <div class="card mb-3 recipe-card" data-recipe-id="{{ recipe.id }}">
+            <!-- Recipe Header (Collapsed View) -->
+            <div class="p-4 flex justify-between items-start recipe-header" data-recipe-id="{{ recipe.id }}">
+                <div class="flex-1">
+                    <h3 class="text-base font-semibold">{{ recipe.title }}</h3>
+                    <div class="text-xs text-gray-500 mt-1">
+                        {{ _('By %(name)s • %(date)s', name=recipe.creator, date=recipe.timestamp|localtime('%b %d, %Y')) }}
+                    </div>
+                    <div class="mt-2 recipe-tags-display" id="tags-recipe-{{ recipe.id }}" data-tags="{{ recipe.tags }}"></div>
+                </div>
+                <div class="flex items-center gap-2 ml-4">
+                    <i class="fa-solid fa-chevron-down text-gray-400 transition-transform" id="chevron-{{ recipe.id }}" aria-hidden="true"></i>
+                </div>
+            </div>
+            
+            <!-- Recipe Content (Expanded View) -->
+            <div class="recipe-content border-t" id="content-{{ recipe.id }}">
+                <div class="p-4 grid md:grid-cols-2 gap-6">
+                    <div>
+                        <h4 class="font-semibold mb-2 flex items-center gap-2">
+                            <i class="fa-solid fa-list-ul section-icon" aria-hidden="true"></i>{{ _('Ingredients') }}
+                        </h4>
+                        <div class="ql-editor prose prose-sm max-w-none">{{ recipe.ingredients|safe }}</div>
+                    </div>
+                    <div>
+                        <h4 class="font-semibold mb-2 flex items-center gap-2">
+                            <i class="fa-solid fa-utensils section-icon" aria-hidden="true"></i>{{ _('Instructions') }}
+                        </h4>
+                        <div class="ql-editor prose prose-sm max-w-none">{{ recipe.instructions|safe }}</div>
+                    </div>
+                </div>
+                {# Older versions saved links without checking them; only http(s) links are shown #}
+                {% if recipe.link and recipe.link.strip().lower().startswith(('http://', 'https://')) %}
+                <div class="px-4 pb-2">
+                    <a href="{{ recipe.link }}" class="hover:underline text-sm" style="color: var(--primary-text);" target="_blank" rel="noopener noreferrer">
+                        <i class="fa-solid fa-arrow-up-right-from-square mr-1" aria-hidden="true"></i>{{ _('View Original Recipe') }}
+                    </a>
+                </div>
+                {% endif %}
+                <div class="px-4 pb-4 flex gap-2">
+                    <a href="/recipes/edit/{{ recipe.id }}" class="btn btn-secondary btn-sm edit-btn" data-creator="{{ recipe.creator }}">
+                        <i class="fa-solid fa-pen" aria-hidden="true"></i>{{ _('Edit') }}
+                    </a>
+                    <form method="POST" action="/recipes/delete/{{ recipe.id }}" class="delete-form inline" data-creator="{{ recipe.creator }}" data-confirm="{{ _('Delete this recipe?') }}">
+                        <input type="hidden" name="user">
+                        <button type="submit" class="btn btn-danger btn-sm">
+                            <i class="fa-solid fa-trash-can" aria-hidden="true"></i>{{ _('Delete') }}
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+<!-- Quill Editor JS -->
+<script src="{{ url_for('static', filename='quill/quill.js') }}"></script>
+<!-- Tag Management JS (reuse from shopping/chores) -->
+<script src="{{ url_for('static', filename='js/tags.js') }}"></script>
+<script src="{{ url_for('static', filename='js/form_tags.js') }}"></script>
+
+<script src="{{ asset_url('js/pages/recipes.js') }}"></script>
+{% endblock %}

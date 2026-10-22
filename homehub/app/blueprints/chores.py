@@ -1,0 +1,551 @@
+from flask import render_template, request, redirect, url_for, current_app, jsonify, flash, session
+from flask_babel import gettext as _
+from datetime import datetime, date, timedelta
+from ..models import db, Chore, RecurringChore
+from ..blueprints import main_bp, json_error_response
+from ..admin import is_admin, can_modify
+from ..security import sanitize_text
+from ..recurrence import next_occurrence as _next_occurrence, first_on_or_after as _next_due_on_or_after, serialized
+from ..undo import offer_undo, restore_row, restorer, row_to_dict, same_record, stamp
+import json
+
+
+def _parse_date(value):
+    if not value:
+        return None
+    try:
+        return datetime.strptime(value, '%Y-%m-%d').date()
+    except Exception:
+        return None
+
+
+@serialized
+def _ensure_current_recurring_chores(today: date | None = None):
+    today = today or date.today()
+    rules = RecurringChore.query.all()
+    active_rows = (
+        Chore.query
+        .filter(Chore.recurring_id.isnot(None))
+        .order_by(Chore.recurring_id.asc(), Chore.due_date.asc(), Chore.timestamp.desc())
+        .all()
+    )
+    active_by_rule: dict[int, Chore] = {}
+    for row in active_rows:
+        if row.recurring_id is None or row.recurring_id in active_by_rule:
+            continue
+        active_by_rule[row.recurring_id] = row
+    changed = False
+    for rule in rules:
+        active = active_by_rule.get(rule.id)
+        # A chore ticked off early is due on a later date; don't pull it back to an earlier one
+        completed_through = rule.last_generated_date if active and rule.last_generated_date else today
+        next_due = _next_due_on_or_after(rule, max(today, completed_through))
+        if next_due is None:
+            if active and not active.done:
+                active.done = True
+                changed = True
+            continue
+        if active:
+            if active.description != rule.description:
+                active.description = rule.description
+                changed = True
+            if active.creator != rule.creator:
+                active.creator = rule.creator
+                changed = True
+            rule_tags = rule.tags or '[]'
+            if active.tags != rule_tags:
+                active.tags = rule_tags
+                changed = True
+            if active.due_date != next_due:
+                active.due_date = next_due
+                changed = True
+            if active.done:
+                active.done = False
+                changed = True
+        else:
+            db.session.add(Chore(
+                description=rule.description,
+                creator=rule.creator,
+                tags=rule.tags or '[]',
+                due_date=next_due,
+                recurring_id=rule.id,
+                done=False,
+            ))
+            changed = True
+        if rule.last_generated_date != next_due:
+            rule.last_generated_date = next_due
+            changed = True
+    if changed:
+        db.session.commit()
+
+
+def _request_user() -> str:
+    return sanitize_text(request.form.get('user', ''))
+
+
+def _ensure_app_setting_table():
+    db.session.execute(db.text("CREATE TABLE IF NOT EXISTS app_setting (key TEXT PRIMARY KEY, value TEXT)"))
+    db.session.commit()
+
+
+def _get_show_chores_on_homepage() -> bool:
+    try:
+        _ensure_app_setting_table()
+        row = db.session.execute(db.text("SELECT value FROM app_setting WHERE key='show_chores_on_homepage'"))
+        value = row.scalar()
+        if value is None:
+            return bool((current_app.config.get('HOMEHUB_CONFIG', {}).get('feature_toggles') or {}).get('show_chores_on_homepage', False))
+        return str(value).strip().lower() in ('1', 'true', 'yes', 'on')
+    except Exception:
+        return False
+
+
+def _set_show_chores_on_homepage(enabled: bool):
+    _ensure_app_setting_table()
+    db.session.execute(
+        db.text("INSERT INTO app_setting(key,value) VALUES('show_chores_on_homepage', :v) ON CONFLICT(key) DO UPDATE SET value=excluded.value"),
+        {'v': '1' if enabled else '0'}
+    )
+    db.session.commit()
+
+
+def _ticked_for_now(chore: Chore, rule: RecurringChore | None, today: date) -> bool:
+    """True when this round of a recurring chore is already ticked off: it is due on a later round.
+
+    The round in play is the rule's first date on or after today. It can be ticked once, early
+    or late; ticking moves the chore to the round after it, where it waits until that date.
+    """
+    if rule is None or chore.done or not chore.due_date:
+        return False
+    current = _next_due_on_or_after(rule, today)
+    return current is not None and chore.due_date > current
+
+
+def _render_chores_page(**form_state):
+    _ensure_current_recurring_chores(date.today())
+    filter_tags = request.args.get('tags')
+    chores = Chore.query.order_by(Chore.done.asc(), Chore.due_date.asc(), Chore.timestamp.desc()).all()
+    if filter_tags:
+        try:
+            selected = json.loads(filter_tags)
+            if isinstance(selected, list) and selected:
+                def match(item_tags):
+                    try:
+                        arr = json.loads(item_tags or '[]')
+                    except Exception:
+                        arr = []
+                    return any(t in arr for t in selected)
+                chores = [i for i in chores if match(i.tags)]
+        except Exception:
+            pass
+    show_chores_on_homepage = _get_show_chores_on_homepage()
+    config = current_app.config['HOMEHUB_CONFIG']
+    today = date.today()
+    rules = {rule.id: rule for rule in RecurringChore.query.all()}
+    ticked_ids = {c.id for c in chores if c.recurring_id and _ticked_for_now(c, rules.get(c.recurring_id), today)}
+    return render_template(
+        'chores.html',
+        chores=chores,
+        ticked_ids=ticked_ids,
+        show_chores_on_homepage=show_chores_on_homepage,
+        today_date=date.today(),
+        **form_state,
+        config=config,
+    )
+
+
+@main_bp.route('/chores', methods=['GET', 'POST'])
+def chores():
+    if request.method == 'POST':
+        chore_id = request.form.get('chore_id')
+        recurring_rule_id = request.form.get('recurring_rule_id')
+        description = sanitize_text(request.form['description'])
+        creator = sanitize_text(request.form['creator'])
+        user = _request_user()
+        raw_tags = request.form.get('tags', '').strip()
+        tags_list = []
+        if raw_tags:
+            try:
+                tags_list = json.loads(raw_tags)
+                if not isinstance(tags_list, list):
+                    tags_list = []
+            except Exception:
+                tags_list = [t.strip() for t in raw_tags.split(',') if t.strip()]
+        tags_list = [sanitize_text(t) for t in tags_list if isinstance(t, str) and t.strip()]
+        is_recurring = request.form.get('is_recurring') in ('1', 'on', 'true', 'yes')
+        if is_recurring:
+            try:
+                interval = max(1, int(request.form.get('rec_interval') or 1))
+            except Exception:
+                interval = 1
+            unit = sanitize_text(request.form.get('rec_unit', 'day')).lower()
+            if unit not in ('day', 'week', 'month', 'year'):
+                unit = 'day'
+            start_date = _parse_date(request.form.get('rec_start_date')) or date.today()
+            end_date = _parse_date(request.form.get('rec_end_date'))
+            if end_date and end_date < start_date:
+                flash(_('Recurring chore end date cannot be before the start date.'), 'error')
+                return _render_chores_page(
+                    form_description=description,
+                    form_tags=json.dumps(tags_list),
+                    form_is_recurring=True,
+                    form_rec_interval=interval,
+                    form_rec_unit=unit,
+                    form_rec_start_date=start_date,
+                    form_rec_end_date=end_date,
+                    form_chore_id=chore_id or '',
+                    form_recurring_rule_id=recurring_rule_id or '',
+                )
+            if end_date and end_date < date.today():
+                flash(_('Recurring chore ends in the past. Choose a future end date to create an active chore.'), 'error')
+                return _render_chores_page(
+                    form_description=description,
+                    form_tags=json.dumps(tags_list),
+                    form_is_recurring=True,
+                    form_rec_interval=interval,
+                    form_rec_unit=unit,
+                    form_rec_start_date=start_date,
+                    form_rec_end_date=end_date,
+                    form_chore_id=chore_id or '',
+                    form_recurring_rule_id=recurring_rule_id or '',
+                )
+            if recurring_rule_id:
+                rule = db.get_or_404(RecurringChore, int(recurring_rule_id))
+                if not can_modify(user, rule.creator or ''):
+                    flash(_('Not allowed to update recurring rule.'), 'error')
+                    return redirect(url_for('main.chores'))
+                snapshot = _chore_rule_snapshot(rule)
+                rule.description = description
+                rule.tags = json.dumps(tags_list)
+                rule.interval = interval
+                rule.unit = unit
+                rule.start_date = start_date
+                rule.end_date = end_date
+                next_due = _next_due_on_or_after(rule, date.today())
+                active = Chore.query.filter_by(recurring_id=rule.id).order_by(Chore.timestamp.desc()).first()
+                if active and next_due is not None:
+                    active.description = description
+                    active.creator = rule.creator
+                    active.tags = json.dumps(tags_list)
+                    active.due_date = next_due
+                    active.done = False
+                rule.last_generated_date = next_due
+                db.session.commit()
+                offer_undo('chore_rule', snapshot, _('Recurring chore updated.'))
+            else:
+                rule = RecurringChore(
+                    description=description,
+                    creator=creator,
+                    tags=json.dumps(tags_list),
+                    interval=interval,
+                    unit=unit,
+                    start_date=start_date,
+                    end_date=end_date,
+                )
+                db.session.add(rule)
+                db.session.commit()
+                next_due = _next_due_on_or_after(rule, date.today())
+                if next_due is not None:
+                    db.session.add(Chore(
+                        description=description,
+                        creator=creator,
+                        tags=json.dumps(tags_list),
+                        due_date=next_due,
+                        recurring_id=rule.id,
+                        done=False,
+                    ))
+                    rule.last_generated_date = next_due
+                    db.session.commit()
+                flash(_('Recurring chore added.'), 'success')
+        else:
+            if recurring_rule_id:
+                rule = db.get_or_404(RecurringChore, int(recurring_rule_id))
+                if not can_modify(user, rule.creator or ''):
+                    flash(_('Not allowed to delete recurring rule.'), 'error')
+                    return redirect(url_for('main.chores'))
+                Chore.query.filter_by(recurring_id=rule.id).delete()
+                db.session.delete(rule)
+                db.session.commit()
+            if chore_id:
+                chore = db.get_or_404(Chore, int(chore_id))
+                if not can_modify(user, chore.creator or ''):
+                    flash(_('Not allowed to update chore.'), 'error')
+                    return redirect(url_for('main.chores'))
+                chore.description = description
+                chore.tags = json.dumps(tags_list)
+                db.session.commit()
+                flash(_('Chore updated.'), 'success')
+            else:
+                chore = Chore(description=description, creator=creator, tags=json.dumps(tags_list))
+                db.session.add(chore)
+                db.session.commit()
+                flash(_('Chore added.'), 'success')
+        return redirect(url_for('main.chores'))
+    return _render_chores_page()
+
+
+@main_bp.route('/chores/edit/<int:chore_id>')
+def edit_chore(chore_id):
+    chore = db.get_or_404(Chore, chore_id)
+    user = request.args.get('user')
+    if not user:
+        user = request.args.get('creator')
+    user = sanitize_text(user or '')
+    creator = (chore.creator or '')
+    if not can_modify(user, creator):
+        flash(_('Not allowed to edit chore.'), 'error')
+        return redirect(url_for('main.chores'))
+    form_state = {
+        'form_description': chore.description,
+        'form_tags': chore.tags or '[]',
+        'form_is_recurring': False,
+        'form_rec_interval': 1,
+        'form_rec_unit': 'day',
+        'form_rec_start_date': None,
+        'form_rec_end_date': None,
+        'form_chore_id': chore.id,
+        'form_recurring_rule_id': '',
+    }
+    if chore.recurring_id:
+        rule = db.session.get(RecurringChore, chore.recurring_id)
+        if rule:
+            form_state.update({
+                'form_description': rule.description,
+                'form_tags': rule.tags or '[]',
+                'form_is_recurring': True,
+                'form_rec_interval': rule.interval or 1,
+                'form_rec_unit': rule.unit or 'day',
+                'form_rec_start_date': rule.start_date,
+                'form_rec_end_date': rule.end_date,
+                'form_recurring_rule_id': rule.id,
+            })
+    return _render_chores_page(**form_state)
+
+
+@main_bp.route('/chores/settings', methods=['POST'])
+def chores_settings():
+    if current_app.config['HOMEHUB_CONFIG'].get('password_hash') and not session.get('authed'):
+        flash(_('Only admin can update chore settings.'), 'error')
+        return redirect(url_for('main.chores'))
+    if not is_admin(sanitize_text(request.form.get('user', ''))):
+        flash(_('Only admin can update chore settings.'), 'error')
+        return redirect(url_for('main.chores'))
+    enabled = request.form.get('show_chores_on_homepage') in ('1', 'on', 'true', 'yes')
+    _set_show_chores_on_homepage(enabled)
+    flash(_('Chore settings updated.'), 'success')
+    return redirect(url_for('main.chores'))
+
+
+@main_bp.route('/chores/recurring/delete/<int:rule_id>', methods=['POST'])
+def delete_recurring_chore(rule_id):
+    rule = db.get_or_404(RecurringChore, rule_id)
+    user = _request_user()
+    if not can_modify(user, rule.creator or ''):
+        flash(_('Not allowed to delete recurring rule.'), 'error')
+        return redirect(url_for('main.chores'))
+    snapshot = _chore_rule_snapshot(rule)
+    Chore.query.filter_by(recurring_id=rule.id).delete()
+    db.session.delete(rule)
+    db.session.commit()
+    offer_undo('chore_rule', snapshot, _('Recurring chore rule deleted.'))
+    return redirect(url_for('main.chores'))
+
+
+def _chore_rule_snapshot(rule: RecurringChore) -> dict:
+    """The rule and the chores it made, for undo."""
+    rows = Chore.query.filter_by(recurring_id=rule.id).all()
+    return {'rule': row_to_dict(rule), 'chores': [row_to_dict(c) for c in rows]}
+
+
+@restorer('chore_rule')
+@serialized
+def _restore_chore_rule(payload: dict) -> None:
+    rule_data = payload['rule']
+    current = db.session.get(RecurringChore, rule_data['id'])
+    # If another rule has taken this id since the delete, its chores are not ours to remove
+    if current is None or same_record(current, rule_data):
+        Chore.query.filter_by(recurring_id=rule_data['id']).delete(synchronize_session=False)
+        db.session.flush()
+        db.session.expire_all()
+    rule = restore_row(RecurringChore, rule_data)
+    for data in payload['chores']:
+        restore_row(Chore, data, recurring_id=rule.id)
+
+
+@restorer('chore_done')
+@serialized
+def _restore_chore_done(payload: dict) -> None:
+    chore = db.session.get(Chore, payload['chore_id'])
+    # Only the chore that was ticked; its id may belong to another one by now
+    if chore is None or chore.recurring_id != payload['rule_id'] or stamp(chore) != payload.get('chore_timestamp'):
+        return
+    rule = db.session.get(RecurringChore, payload['rule_id'])
+    if rule is None or stamp(rule) != payload.get('rule_timestamp'):
+        return
+    chore.due_date = date.fromisoformat(payload['due_date'])
+    chore.done = bool(payload['done'])
+    last = payload.get('last_generated_date')
+    rule.last_generated_date = date.fromisoformat(last) if last else None
+
+
+@main_bp.route('/chores/toggle/<int:chore_id>', methods=['POST'])
+def toggle_chore(chore_id):
+    chore = db.get_or_404(Chore, chore_id)
+    if getattr(chore, 'recurring_id', None):
+        rule = db.session.get(RecurringChore, getattr(chore, 'recurring_id', None))
+        if rule and chore.due_date:
+            today = date.today()
+            current = _next_due_on_or_after(rule, today)
+            if chore.done or _ticked_for_now(chore, rule, today):
+                # Already ticked: a second tap takes the tick back instead of skipping another date
+                if current is None:
+                    flash(_('This recurring chore has ended.'), 'info')
+                    return redirect(url_for('main.chores'))
+                reopened = chore.due_date if chore.done else current
+                chore.done = False
+                chore.due_date = reopened
+                rule.last_generated_date = reopened
+                db.session.commit()
+                flash(_('%(chore)s is open again. Due on %(date)s.', chore=chore.description, date=reopened), 'info')
+                return redirect(url_for('main.chores'))
+            # Ticking a recurring chore moves it to its next date, so offer a way back
+            before = {
+                'chore_id': chore.id,
+                'due_date': chore.due_date.isoformat(),
+                'done': bool(chore.done),
+                'rule_id': rule.id,
+                'chore_timestamp': stamp(chore),
+                'rule_timestamp': stamp(rule),
+                'last_generated_date': rule.last_generated_date.isoformat() if rule.last_generated_date else None,
+            }
+            next_due = _next_occurrence(rule, chore.due_date)
+            if rule.end_date and next_due > rule.end_date:
+                chore.done = True
+                # Past the end date, so the next page load leaves it done instead of reopening it
+                rule.last_generated_date = next_due
+                message = _('%(chore)s done. That was its last date.', chore=chore.description)
+            else:
+                chore.due_date = next_due
+                chore.done = False
+                rule.last_generated_date = next_due
+                message = _('%(chore)s done. Next due on %(date)s.', chore=chore.description, date=next_due)
+            db.session.commit()
+            offer_undo('chore_done', before, message)
+            return redirect(url_for('main.chores'))
+        else:
+            chore.done = not getattr(chore, 'done', False)
+    else:
+        chore.done = not getattr(chore, 'done', False)
+    db.session.commit()
+    return redirect(url_for('main.chores'))
+
+
+@main_bp.route('/chores/delete/<int:chore_id>', methods=['POST'])
+def delete_chore(chore_id):
+    chore = db.get_or_404(Chore, chore_id)
+    user = sanitize_text(request.form.get('user', ''))
+    if getattr(chore, 'recurring_id', None):
+        rule = db.session.get(RecurringChore, getattr(chore, 'recurring_id', None))
+        rule_creator = (rule.creator if rule else chore.creator) or ''
+        if can_modify(user, rule_creator):
+            if rule:
+                snapshot = _chore_rule_snapshot(rule)
+                Chore.query.filter_by(recurring_id=rule.id).delete()
+                db.session.delete(rule)
+                db.session.commit()
+                offer_undo('chore_rule', snapshot, _('Recurring chore rule deleted.'))
+            else:
+                db.session.delete(chore)
+                db.session.commit()
+        else:
+            flash(_('Not allowed to delete recurring rule.'), 'error')
+        return redirect(url_for('main.chores'))
+    if can_modify(user, chore.creator):
+        db.session.delete(chore)
+        db.session.commit()
+        flash(_('Chore deleted.'), 'success')
+    else:
+        flash(_('Not allowed to delete chore.'), 'error')
+    return redirect(url_for('main.chores'))
+
+
+@main_bp.route('/api/chores/<int:chore_id>/tags', methods=['POST'])
+def update_chore_tags(chore_id):
+    chore = db.get_or_404(Chore, chore_id)
+    try:
+        data = request.get_json(force=True) or {}
+        user = sanitize_text(str(data.get('user', '')))
+        if not can_modify(user, chore.creator or ''):
+            return jsonify({"ok": False, "error": "not allowed"}), 403
+        tags = data.get('tags', [])
+        if not isinstance(tags, list):
+            tags = []
+        cleaned = []
+        for t in tags:
+            if isinstance(t, str):
+                cleaned.append(sanitize_text(t))
+        chore.tags = json.dumps(cleaned)
+        db.session.commit()
+        return jsonify({"ok": True, "id": chore.id, "tags": cleaned})
+    except Exception:
+        return json_error_response('Could not update tags for chore %s', chore_id)
+
+
+@main_bp.route('/api/chores', methods=['GET'])
+def api_get_chores():
+    _ensure_current_recurring_chores(date.today())
+    tags = request.args.get('tags')
+    items = Chore.query.order_by(Chore.done.asc(), Chore.due_date.desc(), Chore.timestamp.desc()).all()
+    if tags:
+        try:
+            sel = json.loads(tags)
+            if isinstance(sel, list) and sel:
+                def match(item_tags):
+                    try:
+                        arr = json.loads(item_tags or '[]')
+                    except Exception:
+                        arr = []
+                    return any(t in arr for t in sel)
+                items = [i for i in items if match(i.tags)]
+        except Exception:
+            pass
+    def to_dict(i):
+        try:
+            tg = json.loads(i.tags or '[]')
+        except Exception:
+            tg = []
+        return {
+            "id": i.id,
+            "description": i.description,
+            "done": i.done,
+            "creator": i.creator,
+            "timestamp": i.timestamp.isoformat(),
+            "due_date": i.due_date.strftime('%Y-%m-%d') if i.due_date else None,
+            "recurring_id": i.recurring_id,
+            "tags": tg,
+        }
+    return jsonify([to_dict(i) for i in items])
+
+
+@main_bp.route('/api/chores/<int:chore_id>', methods=['PUT'])
+def api_update_chore(chore_id):
+    chore = db.get_or_404(Chore, chore_id)
+    try:
+        data = request.get_json(force=True) or {}
+        user = sanitize_text(str(data.get('user', '')))
+        if not can_modify(user, chore.creator or ''):
+            return jsonify({"ok": False, "error": "not allowed"}), 403
+        desc = data.get('description')
+        raw_tags = data.get('tags', [])
+        if isinstance(desc, str):
+            chore.description = sanitize_text(desc)
+        tags = []
+        if isinstance(raw_tags, list):
+            for t in raw_tags:
+                if isinstance(t, str):
+                    tags.append(sanitize_text(t))
+        chore.tags = json.dumps(tags)
+        db.session.commit()
+        return jsonify({"ok": True, "item": {"id": chore.id, "description": chore.description, "tags": tags}})
+    except Exception:
+        return json_error_response('Could not update chore %s', chore_id)
