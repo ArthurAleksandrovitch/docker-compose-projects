@@ -368,3 +368,38 @@ docker compose down
 - Добавлены скриншоты баз данных, таблицы и контейнеров PostgreSQL + pgAdmin.
 
 Каждая следующая лабораторная работа будет добавляться в отдельный каталог этого репозитория.
+---
+
+## DrawDB — проектирование ER-диаграмм
+
+В лабораторной работе запущен DrawDB — инструмент для визуального проектирования баз данных.
+
+### Запуск
+
+```powershell
+git clone https://github.com/drawdb-io/drawdb.git drawdb
+cd drawdb
+docker compose -f compose.yml up -d
+```
+
+Откройте приложение в браузере: http://localhost:5173/
+
+### Выполненная работа
+
+- Запущен DrawDB с помощью Docker Compose.
+- Импортирована SQL-схема банковской системы.
+- Создана ER-диаграмма из семи таблиц: `customers`, `accounts`, `cards`, `loans`, `investments`, `transactions`, `transfers`.
+
+### Скриншот
+
+![ER-диаграмма банковской системы в DrawDB](screenshots/drawdb/drawdb-er-diagram.png)
+
+### Полезные команды
+
+```powershell
+docker compose -f compose.yml ps
+docker compose -f compose.yml logs
+docker compose -f compose.yml stop
+docker compose -f compose.yml start
+docker compose -f compose.yml down
+```
