@@ -1,0 +1,16 @@
+﻿services:
+  libredb-studio:
+    image: ghcr.io/libredb/libredb-studio:latest
+    container_name: libredb-studio
+    ports:
+      - "3000:3000"
+    environment:
+      ADMIN_EMAIL: admin@libredb.org
+      STORAGE_PROVIDER: sqlite
+      STORAGE_SQLITE_PATH: /app/data/libredb-storage.db
+    volumes:
+      - libredb-data:/app/data
+    restart: unless-stopped
+
+volumes:
+  libredb-data:

@@ -12,6 +12,7 @@
 | 4 | [PostgreSQL — Docker Compose](postgres-docker-project/) | Запуск PostgreSQL 15, создание баз данных и проверка SQL-запросов | Выполнено |
 | 5 | [PostgreSQL + pgAdmin](postgres-pgadmin-app/) | Управление PostgreSQL через веб-интерфейс pgAdmin и работа с таблицами | Выполнено |
 | 6 | [DrawDB — проектирование ER-диаграмм](#drawdb--проектирование-er-диаграмм) | Создание ER-диаграммы банковской системы из семи таблиц | Выполнено |
+| 7 | [LibreDB Studio](#libredb-studio) | Веб-интерфейс для работы с базами данных в Docker | Выполнено |
 ---
 
 ## 1. Joomla + MariaDB
@@ -406,3 +407,50 @@ docker compose -f compose.yml down
 ```
 
 
+
+
+---
+
+## LibreDB Studio
+
+**LibreDB Studio** — веб-интерфейс для работы с базами данных, запущенный в Docker-контейнере.
+
+### Используемые технологии
+
+- Docker
+- Docker Compose
+- LibreDB Studio
+- SQLite
+- Docker volumes для сохранения данных
+
+### Запуск проекта
+
+Перейдите в каталог проекта:
+
+    cd libredb-studio
+
+Запустите приложение:
+
+    docker compose up -d
+    docker compose ps
+    docker compose logs --tail=50
+
+Откройте приложение в браузере: http://localhost:3000
+
+При первом запуске пароль администратора генерируется автоматически. Он отображается в логах контейнера. Не публикуйте пароль в репозитории.
+
+### Остановка проекта
+
+    docker compose stop
+
+Повторный запуск:
+
+    docker compose start
+
+Остановка с сохранением данных:
+
+    docker compose down
+
+### Скриншот
+
+![LibreDB Studio — работающий веб-интерфейс](screenshots/libredb-studio/libredb-studio.png)
