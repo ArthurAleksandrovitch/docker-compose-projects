@@ -10,6 +10,7 @@
 | 2 | [WordPress + MySQL](wordpress/) | Развёртывание CMS WordPress и базы данных MySQL 8.0 | Выполнено |
 | 3 | [MySQL + phpMyAdmin](mysql-pma-app/) | Управление базами данных MySQL через веб-интерфейс phpMyAdmin | Выполнено |
 | 4 | [PostgreSQL — Docker Compose](postgres-docker-project/) | Запуск PostgreSQL 15, создание баз данных и проверка SQL-запросов | Выполнено |
+| 5 | [PostgreSQL + pgAdmin](postgres-pgadmin-app/) | Управление PostgreSQL через веб-интерфейс pgAdmin и работа с таблицами | Выполнено |
 ---
 
 ## 1. Joomla + MariaDB
@@ -268,6 +269,85 @@ postgres-docker-project/
 
 ---
 
+## 5. PostgreSQL + pgAdmin
+
+**Цель:** развернуть PostgreSQL 17 и pgAdmin с помощью Docker Compose, настроить подключение к базе данных и проверить SQL-запросы.
+
+### Используемые технологии
+
+- Docker и Docker Compose
+- PostgreSQL 17 Alpine
+- pgAdmin 4
+- SQL
+
+### Структура проекта
+
+```text
+postgres-pgadmin-app/
+├── compose.yaml
+├── README.md
+└── screenshots/
+    ├── 01-pgadmin-databases.png
+    ├── 02-pgadmin-users.png
+    └── 03-pgadmin-containers.png
+```
+
+### Архитектура
+
+Проект состоит из двух сервисов:
+
+- `postgres` — сервер PostgreSQL 17, доступный на порту `5432`.
+- `pgadmin` — веб-интерфейс для управления базой данных, доступный на порту `5050`.
+
+Сервисы взаимодействуют через внутреннюю сеть Docker Compose. Данные PostgreSQL хранятся в именованном томе `postgres_data`.
+
+### Доступ к приложениям
+
+- **pgAdmin:** http://localhost:5050
+- **Сервер PostgreSQL внутри Docker:** `postgres-db`
+- **Порт PostgreSQL:** `5432`
+- **База данных:** `mydatabase`
+- **Пользователь PostgreSQL:** `myuser`
+
+### Запуск
+
+```powershell
+cd postgres-pgadmin-app
+docker compose config
+docker compose up -d
+docker compose ps -a
+```
+
+После запуска откройте pgAdmin в браузере, войдите в систему и зарегистрируйте сервер PostgreSQL. В настройках подключения укажите имя сервера `postgres-db`, порт `5432`, базу данных `mydatabase` и пользователя `myuser`.
+
+### Полезные команды
+
+```powershell
+docker compose logs -f postgres
+docker compose logs -f pgadmin
+docker compose ps
+docker compose stop
+docker compose start
+docker compose down
+```
+
+Команда `docker compose down` удаляет контейнеры и сеть проекта, но сохраняет именованный том с данными. Команда `docker compose down -v` удаляет также том с данными PostgreSQL.
+
+### Скриншоты
+
+**Базы данных в pgAdmin**
+
+![Базы данных PostgreSQL в pgAdmin](postgres-pgadmin-app/screenshots/01-pgadmin-databases.png)
+
+**Таблица users с тестовыми записями**
+
+![Таблица users в pgAdmin](postgres-pgadmin-app/screenshots/02-pgadmin-users.png)
+
+**Запущенные контейнеры PostgreSQL и pgAdmin**
+
+![Контейнеры PostgreSQL и pgAdmin](postgres-pgadmin-app/screenshots/03-pgadmin-containers.png)
+
+---
 ## Результаты работы
 
 - Созданы два независимых проекта Docker Compose.
@@ -283,24 +363,8 @@ postgres-docker-project/
 - Созданы базы данных и пользователь через SQL-скрипт инициализации.
 - Проверена таблица `users` с двумя тестовыми записями.
 - Подготовлен каталог `backups` для резервного копирования.
+- Развёрнут PostgreSQL 17 с веб-интерфейсом pgAdmin 4.
+- Создана таблица `users` и добавлены две тестовые записи.
+- Добавлены скриншоты баз данных, таблицы и контейнеров PostgreSQL + pgAdmin.
 
 Каждая следующая лабораторная работа будет добавляться в отдельный каталог этого репозитория.
-
-
-
-### Скриншоты PostgreSQL
-
-**Список баз данных**
-
-![Список баз данных PostgreSQL](<img width="796" height="178" alt="01-postgres-databases" src="https://github.com/user-attachments/assets/2049ff62-dffc-4c3a-a8a4-faef678cf970" />
-)
-
-**Тестовые записи таблицы users**
-
-![Таблица users](<img width="794" height="138" alt="02-postgres-users" src="https://github.com/user-attachments/assets/aeb513ca-d669-4ddd-b2fd-b6c06d652ace" />
-)
-
-**Запущенный контейнер PostgreSQL**
-
-![Контейнер PostgreSQL](<img width="801" height="78" alt="03-postgres-container" src="https://github.com/user-attachments/assets/f9cc61db-be99-4a3d-9b5b-0ff7777f1ae1" />
-)
