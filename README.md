@@ -14,6 +14,7 @@
 | 6 | [DrawDB — проектирование ER-диаграмм](#drawdb--проектирование-er-диаграмм) | Создание ER-диаграммы банковской системы из семи таблиц | Выполнено |
 | 7 | [LibreDB Studio](#libredb-studio) | Веб-интерфейс для работы с базами данных в Docker | Выполнено |
 | 8 | [HomeHub](#homehub) | Семейная веб-панель для заметок, покупок, домашних дел и напоминаний | Выполнено |
+| 9 | [CloudBeaver](#cloudbeaver) | Веб-клиент для работы с базами данных | Выполнено |
 
 ---
 
@@ -511,3 +512,66 @@ docker compose -f compose.yml down
 ### Скриншот
 
 ![HomeHub — запущенная семейная панель](screenshots/homehub/homehub.png)
+
+---
+
+## CloudBeaver
+
+**CloudBeaver** — веб-версия DBeaver для управления подключениями и работы с базами данных через браузер.
+
+### Используемые технологии
+
+- Docker
+- Docker Compose
+- CloudBeaver Community
+- Docker volumes и bind mounts
+
+### Запуск проекта
+
+Перейдите в каталог проекта:
+
+```powershell
+cd CloudBeaver
+```
+
+Запустите контейнер:
+
+```powershell
+docker compose up -d
+```
+
+Проверьте состояние:
+
+```powershell
+docker compose ps
+```
+
+Откройте приложение в браузере: http://localhost:8978
+
+### Конфигурация
+
+Файл `compose.yaml` описывает контейнер CloudBeaver, порт `8978` и постоянное хранение настроек в каталоге `workspace`.
+
+### Управление контейнером
+
+Остановка:
+
+```powershell
+docker compose stop
+```
+
+Запуск:
+
+```powershell
+docker compose start
+```
+
+Просмотр логов:
+
+```powershell
+docker compose logs --tail=50 cloudbeaver
+```
+
+### Скриншот
+
+![CloudBeaver Community — главная страница](screenshots/cloudbeaver/cloudbeaver.png)
